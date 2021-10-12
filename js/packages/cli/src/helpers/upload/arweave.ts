@@ -7,7 +7,7 @@ import { ARWEAVE_PAYMENT_WALLET } from '../constants';
 import { sendTransactionWithRetryWithKeypair } from '../transactions';
 
 async function upload(data: FormData, manifest, index) {
-  log.debug(`trying to upload ${index}.png: ${manifest.name}`);
+  log.info(`trying to upload ${index}.png: ${manifest.name}`);
   return await (
     await fetch(
       'https://us-central1-principal-lane-200702.cloudfunctions.net/uploadFile4',
@@ -46,25 +46,31 @@ export async function arweaveUpload(
     [],
     'single',
   );
-  log.debug('transaction for arweave payment:', tx);
+  log.info('transaction for arweave payment:', tx);
 
   const data = new FormData();
   data.append('transaction', tx['txid']);
   data.append('env', env);
+  console.log('reading image', image, fs.readFileSync(image).length);
+
   data.append('file[]', fs.createReadStream(image), {
     filename: `image.png`,
     contentType: 'image/png',
   });
   data.append('file[]', manifestBuffer, 'metadata.json');
 
+  console.log(data);
+
   const result = await upload(data, manifest, index);
+
+  console.log(result);
 
   const metadataFile = result.messages?.find(
     m => m.filename === 'manifest.json',
   );
   if (metadataFile?.transactionId) {
     const link = `https://arweave.net/${metadataFile.transactionId}`;
-    log.debug(`File uploaded: ${link}`);
+    log.info(`File uploaded: ${link}`);
     return link;
   } else {
     // @todo improve

@@ -31,6 +31,8 @@ export async function upload(
   const savedContent = loadCache(cacheName, env);
   const cacheContent = savedContent || {};
 
+  console.log(cacheContent);
+
   if (!cacheContent.program) {
     cacheContent.program = {};
   }
@@ -79,85 +81,85 @@ export async function upload(
     }
 
     let link = cacheContent?.items?.[index]?.link;
-    if (!link || !cacheContent.program.uuid) {
-      const manifestPath = image.replace(EXTENSION_PNG, '.json');
-      const manifestContent = fs
-        .readFileSync(manifestPath)
-        .toString()
-        .replace(imageName, 'image.png')
-        .replace(imageName, 'image.png');
-      const manifest = JSON.parse(manifestContent);
+    // if (!link || !cacheContent.program.uuid) {
+    const manifestPath = image.replace(EXTENSION_PNG, '.json');
+    const manifestContent = fs
+      .readFileSync(manifestPath)
+      .toString()
+      .replace(imageName, 'image.png')
+      .replace(imageName, 'image.png');
+    const manifest = JSON.parse(manifestContent);
 
-      const manifestBuffer = Buffer.from(JSON.stringify(manifest));
+    const manifestBuffer = Buffer.from(JSON.stringify(manifest));
 
-      if (i === 0 && !cacheContent.program.uuid) {
-        // initialize config
-        log.info(`initializing config`);
-        try {
-          const res = await createConfig(anchorProgram, walletKeyPair, {
-            maxNumberOfLines: new BN(totalNFTs),
-            symbol: manifest.symbol,
-            sellerFeeBasisPoints: manifest.seller_fee_basis_points,
-            isMutable: true,
-            maxSupply: new BN(0),
-            retainAuthority: retainAuthority,
-            creators: manifest.properties.creators.map(creator => {
-              return {
-                address: new PublicKey(creator.address),
-                verified: true,
-                share: creator.share,
-              };
-            }),
-          });
-          cacheContent.program.uuid = res.uuid;
-          cacheContent.program.config = res.config.toBase58();
-          config = res.config;
-
-          log.info(
-            `initialized config for a candy machine with publickey: ${res.config.toBase58()}`,
-          );
-
-          saveCache(cacheName, env, cacheContent);
-        } catch (exx) {
-          log.error('Error deploying config to Solana network.', exx);
-          throw exx;
-        }
-      }
-
-      if (!link) {
-        try {
-          if (storage === 'arweave') {
-            link = await arweaveUpload(
-              walletKeyPair,
-              anchorProgram,
-              env,
-              image,
-              manifestBuffer,
-              manifest,
-              index,
-            );
-          } else if (storage === 'ipfs') {
-            link = await ipfsUpload(ipfsCredentials, image, manifestBuffer);
-          } else if (storage === 'aws') {
-            link = await awsUpload(awsS3Bucket, image, manifestBuffer);
-          }
-
-          if (link) {
-            log.debug('setting cache for ', index);
-            cacheContent.items[index] = {
-              link,
-              name: manifest.name,
-              onChain: false,
+    if (i === 0 && !cacheContent.program.uuid) {
+      // initialize config
+      log.info(`initializing config`);
+      try {
+        const res = await createConfig(anchorProgram, walletKeyPair, {
+          maxNumberOfLines: new BN(totalNFTs),
+          symbol: manifest.symbol,
+          sellerFeeBasisPoints: manifest.seller_fee_basis_points,
+          isMutable: true,
+          maxSupply: new BN(0),
+          retainAuthority: retainAuthority,
+          creators: manifest.properties.creators.map(creator => {
+            return {
+              address: new PublicKey(creator.address),
+              verified: true,
+              share: creator.share,
             };
-            cacheContent.authority = walletKeyPair.publicKey.toBase58();
-            saveCache(cacheName, env, cacheContent);
-          }
-        } catch (er) {
-          uploadSuccessful = false;
-          log.error(`Error uploading file ${index}`, er);
-        }
+          }),
+        });
+        cacheContent.program.uuid = res.uuid;
+        cacheContent.program.config = res.config.toBase58();
+        config = res.config;
+
+        log.info(
+          `initialized config for a candy machine with publickey: ${res.config.toBase58()}`,
+        );
+
+        saveCache(cacheName, env, cacheContent);
+      } catch (exx) {
+        log.error('Error deploying config to Solana network.', exx);
+        throw exx;
       }
     }
+
+    // if (!link) {
+    try {
+      if (storage === 'arweave') {
+        link = await arweaveUpload(
+          walletKeyPair,
+          anchorProgram,
+          env,
+          image,
+          manifestBuffer,
+          manifest,
+          index,
+        );
+      } else if (storage === 'ipfs') {
+        link = await ipfsUpload(ipfsCredentials, image, manifestBuffer);
+      } else if (storage === 'aws') {
+        link = await awsUpload(awsS3Bucket, image, manifestBuffer);
+      }
+
+      if (link) {
+        log.debug('setting cache for ', index);
+        cacheContent.items[index] = {
+          link,
+          name: manifest.name,
+          onChain: false,
+        };
+        cacheContent.authority = walletKeyPair.publicKey.toBase58();
+        saveCache(cacheName, env, cacheContent);
+      }
+    } catch (er) {
+      uploadSuccessful = false;
+      log.error(`Error uploading file ${index}`, er);
+    }
+    // }
+    // }
   }
 
   const keys = Object.keys(cacheContent.items);
