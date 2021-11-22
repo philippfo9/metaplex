@@ -29,6 +29,8 @@ export async function generateConfigurations(
     symbol: '',
     description: '',
     creators: [],
+    dnp: {},
+    premadeCustoms: [],
     collection: {},
     breakdown: {},
     order: traits,
