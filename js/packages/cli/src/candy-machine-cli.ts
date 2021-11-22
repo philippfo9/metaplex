@@ -675,8 +675,13 @@ programCommand('sign_all')
   });
 
 programCommand('generate_art_configurations')
-  .argument('<directory>', 'Directory containing traits named from 0-n', val =>
-    fs.readdirSync(`${val}`),
+  .argument(
+    '<directory>',
+    'Directory containing traits named from 0-n',
+    val => {
+      console.log(val);
+      return fs.readdirSync(`${val}`);
+    },
   )
   .action(async (files: string[]) => {
     log.info('creating traits configuration file');

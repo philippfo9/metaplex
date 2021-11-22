@@ -5,11 +5,26 @@ import { generateRandoms } from '../helpers/various';
 
 const { readdir, writeFile } = fs.promises;
 
+export type TTraitOption = {
+  probability?: number;
+  excludes?: string[];
+};
+
+export type TTraitGroup = {
+  [traitName: string]: TTraitOption;
+};
+
+export type TBreakdown = {
+  [traitGroup: string]: TTraitGroup;
+};
+
+export type TConfig = { [key: string]: any; breakdown: TBreakdown };
+
 export async function generateConfigurations(
   traits: string[],
 ): Promise<boolean> {
   let generateSuccessful: boolean = true;
-  const configs = {
+  const configs: TConfig = {
     name: '',
     symbol: '',
     description: '',
@@ -26,10 +41,13 @@ export async function generateConfigurations(
       traits.map(async trait => {
         const attributes = await readdir(`./traits/${trait}`);
         const randoms = generateRandoms(attributes.length - 1);
-        const tmp = {};
+        const tmp: TTraitGroup = {};
 
         attributes.forEach((attr, i) => {
-          tmp[attr] = randoms[i] / 100;
+          tmp[attr] = {
+            probability: randoms[i] / 100,
+            excludes: [],
+          };
         });
 
         configs['breakdown'][trait] = tmp;

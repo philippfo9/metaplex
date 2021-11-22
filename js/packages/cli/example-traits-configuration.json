@@ -25,7 +25,7 @@
       "egg-eyes.png": 0.3,
       "heart-eyes.png": 0.12,
       "square-eyes.png": 0.02,
-      "star-eyes.png": 0.56
+      "star-eyes.png": 1
     },
     "face": {
       "cyan-face.png": 0.07,
@@ -42,7 +42,7 @@
     "mouth": {
       "block-mouth.png": 0.23,
       "smile-mouth.png": 0.09,
-      "triangle-mouth.png": 0.68
+      "triangle-mouth.png": 0.05
     }
   },
   "order": ["background", "face", "eyes", "mouth"],

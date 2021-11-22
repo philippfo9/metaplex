@@ -2,6 +2,7 @@ import { LAMPORTS_PER_SOL, AccountInfo } from '@solana/web3.js';
 import fs from 'fs';
 import weighted from 'weighted';
 import path from 'path';
+import { TBreakdown, TTraitGroup } from '../commands/generateConfigurations';
 
 const { readFile } = fs.promises;
 
@@ -10,12 +11,41 @@ export async function readJsonFile(fileName: string) {
   return JSON.parse(file);
 }
 
-export const generateRandomSet = breakdown => {
+export const generateRandomSet = (breakdown: TBreakdown) => {
   const tmp = {};
+  const extendedTmp: TTraitGroup = {};
   Object.keys(breakdown).forEach(attr => {
-    const randomSelection = weighted.select(breakdown[attr]);
-    tmp[attr] = randomSelection;
+    let probabilitySum = 0;
+    const simplifiedAttr = {};
+
+    // Check for exclude options & skip
+    if (
+      Object.values(extendedTmp).some(includedTraitValues =>
+        includedTraitValues.excludes?.includes(attr),
+      )
+    ) {
+      return;
+    }
+
+    for (const [optionName, traitValues] of Object.entries(breakdown[attr])) {
+      probabilitySum += traitValues.probability;
+      simplifiedAttr[optionName] = traitValues.probability;
+    }
+
+    const rand = Math.random();
+    if (rand < probabilitySum) {
+      console.log({ attr, probabilitySum, simplifiedAttr });
+
+      const randomSelection = weighted.select(simplifiedAttr);
+
+      console.log({ randomSelection });
+
+      tmp[attr] = randomSelection;
+      extendedTmp[attr] = breakdown[attr][randomSelection];
+    }
   });
+
+  console.log({ tmp, extendedTmp });
 
   return tmp;
 };
@@ -150,6 +180,8 @@ export const getMetadata = (
 ) => {
   const attributes = [];
   for (const prop in attrs) {
+    console.log({ prop });
+
     attributes.push({
       trait_type: prop,
       value: path.parse(attrs[prop]).name,

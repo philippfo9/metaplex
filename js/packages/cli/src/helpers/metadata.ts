@@ -2,6 +2,7 @@ import fs from 'fs';
 import log from 'loglevel';
 import _ from 'lodash';
 import { generateRandomSet, getMetadata, readJsonFile } from './various';
+import { TConfig } from '../commands/generateConfigurations';
 
 const { writeFile, mkdir } = fs.promises;
 
@@ -31,7 +32,7 @@ export async function createMetadataFiles(
     description,
     seller_fee_basis_points,
     collection,
-  } = await readJsonFile(configLocation);
+  } = (await readJsonFile(configLocation)) as TConfig;
 
   while (numberOfFilesCreated < parseInt(numberOfImages, 10)) {
     const randomizedSet = generateRandomSet(breakdown);
