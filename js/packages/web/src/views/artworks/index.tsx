@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ArtCard } from '../../components/ArtCard';
-import { Layout, Row, Col, Tabs } from 'antd';
+import { Layout, Row, Col, Tabs, Button } from 'antd';
 import Masonry from 'react-masonry-css';
 import { Link } from 'react-router-dom';
 import { useCreatorArts, useUserArts } from '../../hooks';
@@ -22,7 +22,7 @@ export const ArtworksView = () => {
   const { connected, publicKey } = useWallet();
   const ownedMetadata = useUserArts();
   const createdMetadata = useCreatorArts(publicKey?.toBase58() || '');
-  const { metadata, isLoading } = useMeta();
+  const { metadata, isLoading, pullAllMetadata, storeIndexer } = useMeta();
   const [activeKey, setActiveKey] = useState(ArtworkViewState.Metaplex);
   const breakpointColumnsObj = {
     default: 4,
@@ -71,6 +71,9 @@ export const ArtworksView = () => {
     </Masonry>
   );
 
+  const refreshButton = connected && storeIndexer.length !== 0 &&
+  <Button className="refresh-button" onClick={() => pullAllMetadata()}>Refresh</Button>
+
   return (
     <Layout style={{ margin: 0, marginTop: 30 }}>
       <Content style={{ display: 'flex', flexWrap: 'wrap' }}>
@@ -79,6 +82,7 @@ export const ArtworksView = () => {
             <Tabs
               activeKey={activeKey}
               onTabClick={key => setActiveKey(key as ArtworkViewState)}
+              tabBarExtraContent={refreshButton}
             >
               <TabPane
                 tab={<span className="tab-title">All</span>}

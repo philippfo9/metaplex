@@ -18,13 +18,13 @@ use {
         AnchorDeserialize, AnchorSerialize,
     },
     anchor_spl::token::{Mint, TokenAccount},
+    metaplex_token_metadata::instruction::{
+        create_master_edition, create_metadata_accounts,
+        mint_new_edition_from_master_edition_via_token, update_metadata_accounts,
+    },
     spl_token::{
         instruction::{initialize_account2, mint_to},
         state::Account,
-    },
-    spl_token_metadata::instruction::{
-        create_master_edition, create_metadata_accounts,
-        mint_new_edition_from_master_edition_via_token, update_metadata_accounts,
     },
 };
 
@@ -35,6 +35,7 @@ pub const LOTTERY: &str = "lottery";
 pub const PARTICIPATION: &str = "participation";
 pub const ACCOUNT: &str = "account";
 pub const MAX_GRANULARITY: u64 = 100;
+anchor_lang::declare_id!("faircnAB9k59Y4TXmLabBULeuTLgV7TkGMGNkjnA15j");
 
 #[program]
 pub mod fair_launch {
@@ -1035,8 +1036,8 @@ pub mod fair_launch {
 
         let authority_seeds = [PREFIX.as_bytes(), token_mint.as_ref(), &[fair_launch.bump]];
 
-        let mut creators: Vec<spl_token_metadata::state::Creator> =
-            vec![spl_token_metadata::state::Creator {
+        let mut creators: Vec<metaplex_token_metadata::state::Creator> =
+            vec![metaplex_token_metadata::state::Creator {
                 address: fair_launch.key(),
                 verified: true,
                 share: 0,
@@ -1044,7 +1045,7 @@ pub mod fair_launch {
 
         if let Some(cre) = &data.creators {
             for c in cre {
-                creators.push(spl_token_metadata::state::Creator {
+                creators.push(metaplex_token_metadata::state::Creator {
                     address: c.address,
                     verified: c.verified,
                     share: c.share,
@@ -1111,7 +1112,7 @@ pub mod fair_launch {
                     *ctx.accounts.metadata.key,
                     fair_launch.key(),
                     None,
-                    Some(spl_token_metadata::state::Data {
+                    Some(metaplex_token_metadata::state::Data {
                         name: data.name,
                         symbol: data.symbol,
                         uri: data.uri,
@@ -1163,8 +1164,8 @@ pub mod fair_launch {
             &[fair_launch.bump],
         ];
 
-        let mut creators: Vec<spl_token_metadata::state::Creator> =
-            vec![spl_token_metadata::state::Creator {
+        let mut creators: Vec<metaplex_token_metadata::state::Creator> =
+            vec![metaplex_token_metadata::state::Creator {
                 address: fair_launch.key(),
                 verified: true,
                 share: 0,
@@ -1172,7 +1173,7 @@ pub mod fair_launch {
 
         if let Some(cre) = &data.creators {
             for c in cre {
-                creators.push(spl_token_metadata::state::Creator {
+                creators.push(metaplex_token_metadata::state::Creator {
                     address: c.address,
                     verified: c.verified,
                     share: c.share,
@@ -1346,8 +1347,8 @@ pub mod fair_launch {
             &[fair_launch.bump],
         ];
 
-        let mut creators: Vec<spl_token_metadata::state::Creator> =
-            vec![spl_token_metadata::state::Creator {
+        let mut creators: Vec<metaplex_token_metadata::state::Creator> =
+            vec![metaplex_token_metadata::state::Creator {
                 address: fair_launch.key(),
                 verified: true,
                 share: 0,
@@ -1355,7 +1356,7 @@ pub mod fair_launch {
 
         if let Some(cre) = &data.creators {
             for c in cre {
-                creators.push(spl_token_metadata::state::Creator {
+                creators.push(metaplex_token_metadata::state::Creator {
                     address: c.address,
                     verified: c.verified,
                     share: c.share,
@@ -1377,7 +1378,7 @@ pub mod fair_launch {
                 *ctx.accounts.metadata.key,
                 fair_launch.key(),
                 None,
-                Some(spl_token_metadata::state::Data {
+                Some(metaplex_token_metadata::state::Data {
                     name: data.name,
                     symbol: data.symbol,
                     uri: data.uri,
@@ -1818,7 +1819,7 @@ pub struct SetTokenMetadata<'info> {
     metadata: AccountInfo<'info>,
     #[account(mut)]
     token_mint: AccountInfo<'info>,
-    #[account(address = spl_token_metadata::id())]
+    #[account(address = metaplex_token_metadata::id())]
     token_metadata_program: AccountInfo<'info>,
     #[account(address = spl_token::id())]
     token_program: AccountInfo<'info>,
@@ -1847,7 +1848,7 @@ pub struct SetParticipationNFT<'info> {
     metadata: AccountInfo<'info>,
     #[account(mut)]
     master_edition: AccountInfo<'info>,
-    #[account(address = spl_token_metadata::id())]
+    #[account(address = metaplex_token_metadata::id())]
     token_metadata_program: AccountInfo<'info>,
     #[account(address = spl_token::id())]
     token_program: AccountInfo<'info>,
@@ -1867,7 +1868,7 @@ pub struct UpdateParticipationNFT<'info> {
     // through to token-metadata which will do all the validations we need on them.
     #[account(mut)]
     metadata: AccountInfo<'info>,
-    #[account(address = spl_token_metadata::id())]
+    #[account(address = metaplex_token_metadata::id())]
     token_metadata_program: AccountInfo<'info>,
     #[account(address = spl_token::id())]
     token_program: AccountInfo<'info>,
@@ -1905,7 +1906,7 @@ pub struct MintParticipationNFT<'info> {
     master_edition: AccountInfo<'info>,
     #[account(mut)]
     edition_mark_pda: AccountInfo<'info>,
-    #[account(address = spl_token_metadata::id())]
+    #[account(address = metaplex_token_metadata::id())]
     token_metadata_program: AccountInfo<'info>,
     #[account(address = spl_token::id())]
     token_program: AccountInfo<'info>,
