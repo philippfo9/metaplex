@@ -5,13 +5,18 @@ import { generateRandoms } from '../helpers/various';
 
 const { readdir, writeFile } = fs.promises;
 
-export type TTraitOption = {
-  probability?: number;
-  excludes?: string[];
-};
+export type TTraitValue =
+  | number
+  | ({
+      [otherAttr: string]: {
+        [otherTraitVal: string]: number;
+      };
+    } & {
+      baseValue: number;
+    });
 
 export type TTraitGroup = {
-  [traitName: string]: TTraitOption;
+  [traitName: string]: TTraitValue;
 };
 
 export type TBreakdown = {
@@ -46,10 +51,7 @@ export async function generateConfigurations(
         const tmp: TTraitGroup = {};
 
         attributes.forEach((attr, i) => {
-          tmp[attr] = {
-            probability: randoms[i] / 100,
-            excludes: [],
-          };
+          tmp[attr] = randoms[i] / 100;
         });
 
         configs['breakdown'][trait] = tmp;

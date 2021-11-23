@@ -1,7 +1,6 @@
 import fs from 'fs';
 import log from 'loglevel';
 import _ from 'lodash';
-import { TConfig } from '../commands/generateConfigurations';
 import {
   generateRandomSet,
   getMetadata,
@@ -37,7 +36,11 @@ export async function createMetadataFiles(
     description,
     seller_fee_basis_points,
     collection,
-  } = (await readJsonFile(configLocation)) as TConfig;
+    dnp,
+    premadeCustoms,
+  } = await readJsonFile(configLocation);
+
+  console.log('dnp', dnp);
 
   while (numberOfFilesCreated < premadeCustoms.length) {
     randomizedSets.push(premadeCustoms[numberOfFilesCreated]);

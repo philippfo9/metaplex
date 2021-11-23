@@ -2,7 +2,11 @@ import { LAMPORTS_PER_SOL, AccountInfo } from '@solana/web3.js';
 import fs from 'fs';
 import weighted from 'weighted';
 import path from 'path';
-import { TBreakdown, TTraitGroup } from '../commands/generateConfigurations';
+import {
+  TBreakdown,
+  TTraitGroup,
+  TTraitValue,
+} from '../commands/generateConfigurations';
 import { Program, web3 } from '@project-serum/anchor';
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
@@ -13,6 +17,17 @@ export async function readJsonFile(fileName: string) {
   return JSON.parse(file);
 }
 
+export const shouldIncludeTrait = (attr: TTraitGroup) => {
+  let probabilitySum = 0;
+
+  for (const traitValue of Object.values(attr)) {
+    probabilitySum += getProbabilityOfAttribute(traitValue);
+  }
+
+  const rand = Math.random();
+  return rand < probabilitySum;
+};
+
 export const generateRandomSetOld = (breakdown: TBreakdown) => {
   const tmp = {};
   const extendedTmp: TTraitGroup = {};
@@ -20,18 +35,9 @@ export const generateRandomSetOld = (breakdown: TBreakdown) => {
     let probabilitySum = 0;
     const simplifiedAttr = {};
 
-    // Check for exclude options & skip
-    if (
-      Object.values(extendedTmp).some(includedTraitValues =>
-        includedTraitValues.excludes?.includes(attr),
-      )
-    ) {
-      return;
-    }
-
-    for (const [optionName, traitValues] of Object.entries(breakdown[attr])) {
-      probabilitySum += traitValues.probability;
-      simplifiedAttr[optionName] = traitValues.probability;
+    for (const [optionName, traitValue] of Object.entries(breakdown[attr])) {
+      probabilitySum += getProbabilityOfAttribute(traitValue);
+      simplifiedAttr[optionName] = traitValue;
     }
 
     const rand = Math.random();
@@ -82,7 +88,15 @@ export const assertValidBreakdown = breakdown => {
   }
 };
 
-export const generateRandomSet = (breakdown, dnp) => {
+export const getProbabilityOfAttribute = (attr: TTraitValue): number => {
+  if (typeof attr === 'number') {
+    return attr;
+  } else {
+    return attr.baseValue;
+  }
+};
+
+export const generateRandomSet = (breakdown: TBreakdown, dnp) => {
   let valid = true;
   let tmp = {};
 
@@ -96,30 +110,29 @@ export const generateRandomSet = (breakdown, dnp) => {
       keys,
     );
 
-    keys.forEach(attr => {
+    for (const attr of keys) {
       const breakdownToUse = breakdown[attr];
 
+      if (!shouldIncludeTrait(breakdownToUse)) continue;
+
       const formatted = Object.keys(breakdownToUse).reduce((f, key) => {
-        if (breakdownToUse[key]['baseValue']) {
-          f[key] = breakdownToUse[key]['baseValue'];
-        } else {
-          f[key] = breakdownToUse[key];
-        }
+        f[key] = getProbabilityOfAttribute(breakdownToUse[key]);
         return f;
       }, {});
 
-      assertValidBreakdown(formatted);
       const randomSelection = weighted.select(formatted);
       tmp[attr] = randomSelection;
-    });
+    }
 
-    keys.forEach(attr => {
+    // will only run for traits that are already included so can skip running 'shouldIncludeTrait' func again
+    for (const attr of keys) {
       let breakdownToUse = breakdown[attr];
 
-      keys.forEach(otherAttr => {
+      for (const otherAttr of keys) {
         if (
           tmp[otherAttr] &&
-          typeof breakdown[otherAttr][tmp[otherAttr]] != 'number' &&
+          typeof breakdown[otherAttr][tmp[otherAttr]]['probability'] !=
+            'number' &&
           breakdown[otherAttr][tmp[otherAttr]][attr]
         ) {
           breakdownToUse = breakdown[otherAttr][tmp[otherAttr]][attr];
@@ -131,22 +144,35 @@ export const generateRandomSet = (breakdown, dnp) => {
             attr,
           );
 
-          assertValidBreakdown(breakdownToUse);
           const randomSelection = weighted.select(breakdownToUse);
           tmp[attr] = randomSelection;
         }
-      });
-    });
+      }
+    }
 
     Object.keys(tmp).forEach(attr1 => {
       Object.keys(tmp).forEach(attr2 => {
+        // attr 1 e.g. background
+        // attr 2 e.g. eyes
         if (
+          dnp &&
           dnp[attr1] &&
           dnp[attr1][tmp[attr1]] &&
           dnp[attr1][tmp[attr1]][attr2] &&
-          dnp[attr1][tmp[attr1]][attr2].includes(tmp[attr2])
+          dnp[attr1][tmp[attr1]][attr2].some(
+            dnpElem =>
+              // check for direct name
+              dnpElem === tmp[attr2] ||
+              // check for regex
+              new RegExp(dnpElem).test(tmp[attr2]) ||
+              // check to exclude whole category
+              dnpElem === '*',
+          )
         ) {
-          console.log('Not including', tmp[attr1], tmp[attr2], 'together');
+          console.log('Not including', tmp[attr1], tmp[attr2], 'together', {
+            attr1,
+            attr2,
+          });
           valid = false;
           tmp = {};
         }
