@@ -131,8 +131,7 @@ export const generateRandomSet = (breakdown: TBreakdown, dnp) => {
       for (const otherAttr of keys) {
         if (
           tmp[otherAttr] &&
-          typeof breakdown[otherAttr][tmp[otherAttr]]['probability'] !=
-            'number' &&
+          typeof breakdown[otherAttr][tmp[otherAttr]] != 'number' &&
           breakdown[otherAttr][tmp[otherAttr]][attr]
         ) {
           breakdownToUse = breakdown[otherAttr][tmp[otherAttr]][attr];
