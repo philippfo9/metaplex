@@ -96,32 +96,111 @@ export const getProbabilityOfAttribute = (attr: TTraitValue): number => {
   }
 };
 
-export const generateRandomSet = (breakdown: TBreakdown, dnp) => {
+export const generateRandomSet = (breakdown: TBreakdown, dnp, need) => {
   let valid = true;
   let tmp = {};
 
   do {
     valid = true;
-    const keys = shuffle(Object.keys(breakdown));
-    console.log(
+    const keys = Object.keys(breakdown);
+    console.log('starting with role', tmp['Role']);
+
+    /* console.log(
       'breakdown keys',
       Object.keys(breakdown),
       'shuffled keys',
       keys,
-    );
+    ); */
+
+    
+
+    const getSelectUntilFittingForRole = (attr: string) => {
+      let isValidAttr = false;
+      let runs = 0;
+      while (!isValidAttr && runs < 50) {
+        runs++;
+        const breakdownToUse = breakdown[attr];
+
+        const formatted = Object.keys(breakdownToUse).reduce((f, key) => {
+          f[key] = getProbabilityOfAttribute(breakdownToUse[key]);
+          return f;
+        }, {});
+
+        const randomSelection = weighted.select(formatted);
+
+        if (tmp['Role']) {
+          console.log('the role', tmp['Role'], { attr, randomSelection });
+
+          const needForRole = need['Role'][tmp['Role']];
+          const dnpForRole = dnp['Role'][tmp['Role']];
+          console.log({dnpForRole});
+          
+          if (dnpForRole) {
+            const isSomeDNPExisting = dnpForRole.some(dnpElem => {
+              console.log('checking dnp', {dnpElem, randomSelection});
+              
+              return (
+                dnpElem.toLowerCase() === (randomSelection || '').toLowerCase() ||
+                // check for regex
+                new RegExp(dnpElem, 'i').test(randomSelection)
+              );
+            });
+            if (isSomeDNPExisting) continue;
+          }
+
+          if (
+            needForRole &&
+            (tmp['Role'] === 'Businessman.png' ||
+              tmp['Role'] === 'Scientist.png') &&
+            attr === 'Upper_Part'
+          ) {
+            const isNeededFulFilled = needForRole.some(needElem => {
+              console.log('checking need', {needElem, randomSelection});
+              return (
+                // check for direct name
+                needElem.toLowerCase() === (randomSelection || '').toLowerCase() ||
+                // check for regex
+                new RegExp(needElem, 'i').test(randomSelection)
+              );
+            });
+
+            if (!isNeededFulFilled) {
+              continue;
+            }
+          }
+        }
+
+        if (tmp['Form']) {
+          console.log('the Form', tmp['Form'], { attr, randomSelection });
+
+          const dnpForForm = dnp['Form'][tmp['Form']];
+          console.log({dnpForForm});
+          
+          if (dnpForForm) {
+            const isSomeDNPExisting = dnpForForm.some(dnpElem => {
+              console.log('checking dnp', {dnpElem, randomSelection});
+              
+              return (
+                dnpElem.toLowerCase() === (randomSelection || '').toLowerCase() ||
+                // check for regex
+                new RegExp(dnpElem, 'i').test(randomSelection)
+              );
+            });
+            if (isSomeDNPExisting) continue;
+          }
+        }
+
+        isValidAttr = true;
+        tmp[attr] = randomSelection;
+      }
+      console.log({isValidAttr, attr, selection: tmp[attr], runs});
+    };
 
     for (const attr of keys) {
+      if (attr === 'Role' && tmp[attr]) continue;
       const breakdownToUse = breakdown[attr];
-
       if (!shouldIncludeTrait(breakdownToUse)) continue;
-
-      const formatted = Object.keys(breakdownToUse).reduce((f, key) => {
-        f[key] = getProbabilityOfAttribute(breakdownToUse[key]);
-        return f;
-      }, {});
-
-      const randomSelection = weighted.select(formatted);
-      tmp[attr] = randomSelection;
+      getSelectUntilFittingForRole(attr)
     }
 
     // will only run for traits that are already included so can skip running 'shouldIncludeTrait' func again
@@ -141,6 +220,7 @@ export const generateRandomSet = (breakdown: TBreakdown, dnp) => {
             tmp[otherAttr],
             'we are using different probabilites for',
             attr,
+            breakdownToUse
           );
 
           const randomSelection = weighted.select(breakdownToUse);
@@ -153,31 +233,90 @@ export const generateRandomSet = (breakdown: TBreakdown, dnp) => {
       Object.keys(tmp).forEach(attr2 => {
         // attr 1 e.g. background
         // attr 2 e.g. eyes
+
         if (
           dnp &&
           dnp[attr1] &&
           dnp[attr1][tmp[attr1]] &&
-          dnp[attr1][tmp[attr1]][attr2] &&
-          dnp[attr1][tmp[attr1]][attr2].some(
-            dnpElem =>
-              // check for direct name
-              dnpElem === tmp[attr2] ||
+          dnp[attr1][tmp[attr1]].some(dnpElem => {
+            /* console.log('check dnp elem', dnpElem, tmp[attr2]);
+            console.log(
+              dnpElem,
+              tmp[attr2], // check for direct name
+              dnpElem.toLowerCase() === (tmp[attr2] || '').toLowerCase(),
               // check for regex
-              new RegExp(dnpElem).test(tmp[attr2]) ||
+              'a',
+              new RegExp(dnpElem, 'i').test(tmp[attr2]),
+              'b',
+              dnpElem.replace('(.*)?', '').includes(tmp[attr2]),
               // check to exclude whole category
               dnpElem === '*',
-          )
+            ); */
+            return (
+              // check for direct name
+              dnpElem.toLowerCase() === (tmp[attr2] || '').toLowerCase() ||
+              // check for regex
+              new RegExp(dnpElem, 'i').test(tmp[attr2]) ||
+              // check to exclude whole category
+              dnpElem === attr2
+            );
+          })
         ) {
-          console.log('Not including', tmp[attr1], tmp[attr2], 'together', {
-            attr1,
-            attr2,
-          });
+          console.log(
+            'For DNP Not including',
+            tmp[attr1],
+            tmp[attr2],
+            'together',
+            {
+              attr1,
+              attr2,
+              tmp,
+            },
+          );
           valid = false;
-          tmp = {};
+          tmp = {
+            Role: tmp['Role'],
+          };
         }
       });
     });
+
+    Object.keys(tmp).forEach(attr1 => {
+      if (need && need[attr1] && need[attr1][tmp[attr1]]) {
+        const isSomeRequiredExisiting = need[attr1][tmp[attr1]].some(
+          needsElem => {
+            return Object.keys(tmp).some(attr2 => {
+              if (attr1 === attr2) return false;
+              return (
+                // check for direct name
+                needsElem.toLowerCase() === (tmp[attr2] || '').toLowerCase() ||
+                // check for regex
+                new RegExp(needsElem, 'i').test(tmp[attr2]) ||
+                // check to include one of a category
+                needsElem === attr2
+              );
+            });
+          },
+        );
+
+        if (!isSomeRequiredExisiting) {
+          console.log('For NEED', tmp[attr1], 'not including required one', {
+            attr1,
+            tmp,
+            need: need[attr1][tmp[attr1]]
+          });
+
+          valid = false;
+          tmp = {
+            Role: tmp['Role'],
+          };
+        }
+      }
+    });
+
+    console.log('ending with role', tmp['Role']);
   } while (!valid);
+  console.log('Generated role', tmp['Role']);
   return tmp;
 };
 
@@ -311,8 +450,6 @@ export const getMetadata = (
 ) => {
   const attributes = [];
   for (const prop in attrs) {
-    console.log({ prop });
-
     attributes.push({
       trait_type: prop,
       value: path.parse(attrs[prop]).name,

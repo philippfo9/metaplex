@@ -915,6 +915,31 @@ programCommand('get_all_mint_addresses').action(async (directory, cmd) => {
   console.log(JSON.stringify(addresses, null, 2));
 });
 
+programCommand('analyze_assets')
+  .argument(
+    '<directory>',
+    'Directory containing traits named from 0-n',
+    val => {
+      console.log(val);
+      return fs.readdirSync(`${val}`);
+    },
+  )
+  .action(async (files: string[]) => {
+    log.info('creating traits configuration file');
+    const startMs = Date.now();
+    const successful = await generateConfigurations(files);
+    const endMs = Date.now();
+    const timeTaken = new Date(endMs - startMs).toISOString().substr(11, 8);
+    if (successful) {
+      log.info('traits-configuration.json has been created!');
+      log.info(
+        `ended at: ${new Date(endMs).toISOString()}. time taken: ${timeTaken}`,
+      );
+    } else {
+      log.info('The art configuration file was not created');
+    }
+  });
+
 programCommand('generate_art_configurations')
   .argument(
     '<directory>',

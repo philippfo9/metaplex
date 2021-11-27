@@ -37,10 +37,9 @@ export async function createMetadataFiles(
     seller_fee_basis_points,
     collection,
     dnp,
+    need,
     premadeCustoms,
   } = await readJsonFile(configLocation);
-
-  console.log('dnp', dnp);
 
   while (numberOfFilesCreated < premadeCustoms.length) {
     randomizedSets.push(premadeCustoms[numberOfFilesCreated]);
@@ -48,7 +47,7 @@ export async function createMetadataFiles(
   }
 
   while (numberOfFilesCreated < parseInt(numberOfImages, 10)) {
-    const randomizedSet = generateRandomSet(breakdown, dnp);
+    const randomizedSet = generateRandomSet(breakdown, dnp, need);
 
     if (!_.some(randomizedSets, randomizedSet)) {
       randomizedSets.push(randomizedSet);

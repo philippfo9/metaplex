@@ -26,11 +26,12 @@ function makeCreateImageWithCanvas(order, width, height) {
       const optimizedImage = await imagemin.buffer(buffer, {
         plugins: [
           imageminPngquant({
-            quality: [0.6, 0.95],
+            quality: [0.5, 0.85],
           }),
         ],
       });
       await writeFile(`${ASSETS_DIRECTORY}/${ID}.png`, optimizedImage);
+
       const end = Date.now();
       log.info(`Placed ${ID}.png into ${ASSETS_DIRECTORY}.`);
       const duration = end - start;
