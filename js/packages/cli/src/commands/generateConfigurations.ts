@@ -5,11 +5,31 @@ import { generateRandoms } from '../helpers/various';
 
 const { readdir, writeFile } = fs.promises;
 
+export type TTraitValue =
+  | number
+  | ({
+      [otherAttr: string]: {
+        [otherTraitVal: string]: number;
+      };
+    } & {
+      baseValue: number;
+    });
+
+export type TTraitGroup = {
+  [traitName: string]: TTraitValue;
+};
+
+export type TBreakdown = {
+  [traitGroup: string]: TTraitGroup;
+};
+
+export type TConfig = { [key: string]: any; breakdown: TBreakdown };
+
 export async function generateConfigurations(
   traits: string[],
 ): Promise<boolean> {
   let generateSuccessful: boolean = true;
-  const configs = {
+  const configs: TConfig = {
     name: '',
     symbol: '',
     description: '',

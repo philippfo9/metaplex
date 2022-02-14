@@ -1,4 +1,6 @@
 import os from 'os';
+import fs from 'fs';
+const gifFrames = require('gif-frames');
 import { writeFile } from 'fs/promises';
 import { createCanvas, loadImage } from 'canvas';
 import imagemin from 'imagemin';
@@ -7,14 +9,69 @@ import log from 'loglevel';
 
 import { readJsonFile } from '../helpers/various';
 import { ASSETS_DIRECTORY, TRAITS_DIRECTORY } from '../helpers/metadata';
+import { Stream } from 'form-data';
+const GIFEncoder = require('gifencoder');
 
 function makeCreateImageWithCanvas(order, width, height) {
   return function makeCreateImage(canvas, context) {
     return async function createImage(image) {
       const start = Date.now();
       const ID = parseInt(image.id, 10) - 1;
+      const gifCur = order.find(
+        cur => image[cur] && image[cur].includes('.gif'),
+      );
+
+      if (gifCur) {
+        const loadGifCur = async (gifCur: any) => {
+          const encoder = new GIFEncoder(width, height);
+          encoder
+            .createReadStream()
+            .pipe(fs.createWriteStream(`${ASSETS_DIRECTORY}/${ID}.gif`));
+          encoder.start();
+          encoder.setRepeat(0); // 0 for repeat, -1 for no-repeat
+          encoder.setDelay(33); // frame delay in ms
+          encoder.setQuality(10); // image quality. 10 is default.
+          context.patternQuality = 'best';
+          context.quality = 'best';
+          console.log(order, image);
+          const gifLocation = `${TRAITS_DIRECTORY}/${gifCur}/${image[gifCur]}`;
+          const frameData = await gifFrames({
+            url: gifLocation,
+            frames: 'all',
+            outputType: 'png',
+          });
+
+          for (const frame of frameData) {
+            for (const cur of order) {
+              if (cur === gifCur) {
+                context.drawImage(
+                  await loadImage(await stream2buffer(frame.getImage())),
+                  0,
+                  0,
+                  width,
+                  height,
+                );
+              } else {
+                const imageLocation = `${TRAITS_DIRECTORY}/${cur}/${image[cur]}`;
+                const loadedImage = await loadImage(imageLocation);
+                context.drawImage(loadedImage, 0, 0, width, height);
+              }
+            }
+            encoder.addFrame(context);
+          }
+
+          encoder.finish();
+
+          return;
+        };
+        await loadGifCur(gifCur);
+      }
+
       for (const cur of order) {
-        const imageLocation = `${TRAITS_DIRECTORY}/${cur}/${image[cur]}`;
+        let imgName = image[cur];
+        if (!imgName) continue;
+        if (!imgName.includes('.png')) imgName = imgName + '.png';
+        const imageLocation = `${TRAITS_DIRECTORY}/${cur}/${imgName}`;
         const loadedImage = await loadImage(imageLocation);
         context.patternQuality = 'best';
         context.quality = 'best';
@@ -72,4 +129,14 @@ export async function createGenerativeArt(
   const end = Date.now();
   const duration = end - start;
   log.info(`Generated ${imagesNb} images in`, `${duration / 1000}s.`);
+}
+
+async function stream2buffer(stream: Stream): Promise<Buffer> {
+  return new Promise<Buffer>((resolve, reject) => {
+    const _buf = Array<any>();
+
+    stream.on('data', chunk => _buf.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(_buf)));
+    stream.on('error', err => reject(`error converting stream - ${err}`));
+  });
 }

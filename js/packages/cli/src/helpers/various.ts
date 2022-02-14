@@ -8,6 +8,7 @@ import { StorageType } from './storage-type';
 import { getAtaForMint } from './accounts';
 import { CLUSTERS, DEFAULT_CLUSTER } from './constants';
 import { Uses, UseMethod } from '@metaplex-foundation/mpl-token-metadata';
+import { TTraitGroup, TTraitValue } from '../commands/generateConfigurations';
 
 const { readFile } = fs.promises;
 
@@ -243,72 +244,405 @@ export const assertValidBreakdown = breakdown => {
   }
 };
 
-export const generateRandomSet = (breakdown, dnp) => {
+export const getProbabilityOfAttribute = (attr: TTraitValue): number => {
+  if (typeof attr === 'number') {
+    return attr;
+  } else {
+    return attr.baseValue;
+  }
+};
+
+export const shouldIncludeTrait = (attr: TTraitGroup) => {
+  let probabilitySum = 0;
+
+  for (const traitValue of Object.values(attr)) {
+    probabilitySum += getProbabilityOfAttribute(traitValue);
+  }
+
+  const rand = Math.random() * 100;
+  console.log({ attr, rand, probabilitySum });
+
+  return rand < probabilitySum;
+};
+
+const checkIfCategoryShouldBeIgnored = (dnp, tmp, attr) => {
+  for (const existingAttr in tmp) {
+    const existingTrait = tmp[existingAttr];
+    if (dnp && dnp[existingAttr] && dnp[existingAttr][tmp[existingTrait]]) {
+      const dnpDefinition = dnp[existingAttr][tmp[existingTrait]];
+
+      if (
+        Array.isArray(dnpDefinition) &&
+        dnpDefinition.some(dnpElem => {
+          return (
+            // check to exclude whole category
+            dnpElem === attr
+          );
+        })
+      ) {
+        return true;
+      }
+    }
+
+    if (dnp && dnp[existingAttr]) {
+      if (
+        dnp[existingAttr].attributesToExclude &&
+        dnp[existingAttr].attributesToExclude.some(attrToExcl => {
+          return (
+            // check to exclude whole category
+            attrToExcl === attr
+          );
+        })
+      ) {
+        return true;
+      }
+
+      for (const [key, dnpConfig] of Object.entries(dnp[existingAttr])) {
+        console.log('found key', { key, existingTrait, dnpConfig });
+
+        if (new RegExp(key, 'i').test(existingTrait)) {
+          if (
+            (dnpConfig as any).some(dnpItem => {
+              return dnpItem === attr;
+            })
+          ) {
+            console.log('exluding for', {
+              attr,
+              key,
+              dnpConfig,
+            });
+            return true;
+          }
+        }
+      }
+    }
+  }
+};
+
+const checkIfTraitShouldBeIgnored = (dnp, need, tmp, attr, randomSelection) => {
+  for (const existingAttr in tmp) {
+    if (tmp[existingAttr] === randomSelection) continue;
+    const existingTrait = tmp[existingAttr];
+
+    if (
+      dnp &&
+      dnp[existingAttr] &&
+      dnp[existingAttr][tmp[existingTrait]] &&
+      dnp[existingAttr][tmp[existingTrait]].some(dnpElem => {
+        console.log('checking dnp', { dnpElem, randomSelection });
+
+        return (
+          dnpElem.toLowerCase() === (randomSelection || '').toLowerCase() ||
+          // check for regex
+          new RegExp(dnpElem, 'i').test(randomSelection) ||
+          dnpElem === attr
+        );
+      })
+    ) {
+      return true;
+    }
+
+    if (
+      dnp &&
+      dnp[existingAttr] &&
+      dnp[existingAttr].attributesToExclude &&
+      dnp[existingAttr].attributesToExclude.some(attrToExcl => {
+        return (
+          // check to exclude whole category
+          attrToExcl === randomSelection
+        );
+      })
+    ) {
+      return true;
+    }
+
+    if (dnp && dnp[existingAttr]) {
+      for (const [key, dnpConfig] of Object.entries(dnp[existingAttr])) {
+        console.log('found key in trait check', {
+          key,
+          existingTrait,
+          dnpConfig,
+        });
+
+        if (new RegExp(key, 'i').test(existingTrait)) {
+          if (
+            (dnpConfig as any).some(dnpItem => {
+              return (
+                dnpItem.toLowerCase() ===
+                  (randomSelection || '').toLowerCase() ||
+                // check for regex
+                new RegExp(dnpItem, 'i').test(randomSelection) ||
+                dnpItem === attr
+              );
+            })
+          ) {
+            console.log('exluding for', {
+              attr,
+              key,
+              dnpConfig,
+            });
+            return true;
+          }
+        }
+      }
+    }
+  }
+};
+
+const firstAttributes = [
+  'Background',
+  'Species',
+  'Body',
+  'Head',
+  'Face',
+  'Chest',
+];
+
+/*
+  1. implement required end check
+  2. investigate need end check
+  3. implement for max
+  4. work 
+
+*/
+
+export const generateRandomSet = (breakdown, dnp, need, required) => {
   let valid = true;
   let tmp = {};
 
   do {
     valid = true;
     const keys = shuffle(Object.keys(breakdown));
-    keys.forEach(attr => {
-      const breakdownToUse = breakdown[attr];
 
-      const formatted = Object.keys(breakdownToUse).reduce((f, key) => {
-        if (breakdownToUse[key]['baseValue']) {
-          f[key] = breakdownToUse[key]['baseValue'];
-        } else {
-          f[key] = breakdownToUse[key];
+    const followUpRequired = (attr: string, randomSelection: string) => {
+      console.log('just received followup for', { attr, randomSelection });
+
+      const requiredForAttr: any = required[attr];
+      if (requiredForAttr) {
+        for (const [key, requiredConfig] of Object.entries(requiredForAttr)) {
+          if (new RegExp(key, 'i').test(randomSelection)) {
+            console.log('found following follup for', {
+              attr,
+              randomSelection,
+              key,
+            });
+            const requiredConf: any = requiredConfig;
+            for (const followUpAttribute of requiredConf.attributes) {
+              getSelectUntilFitting(followUpAttribute);
+            }
+            for (const followUpTrait of requiredConf.traits) {
+              console.log('adding', { followUpTrait });
+              if (
+                followUpTrait.trait.includes('.png') ||
+                followUpTrait.trait.includes('.gif')
+              ) {
+                tmp[followUpTrait.attribute] = followUpTrait.trait;
+              } else {
+                const breakdownToUse = breakdown[followUpTrait.attribute];
+                const formatted = Object.keys(breakdownToUse)
+                  .filter(key => {
+                    return new RegExp(followUpTrait.trait, 'i').test(key);
+                  })
+                  .reduce((f, key) => {
+                    f[key] = getProbabilityOfAttribute(breakdownToUse[key]);
+                    return f;
+                  }, {});
+                const randomSubSelection = weighted.select(formatted);
+                tmp[followUpTrait.attribute] = randomSubSelection;
+              }
+              console.log(
+                'added as follow up trait:',
+                followUpTrait.attribute,
+                tmp[followUpTrait.attribute],
+              );
+            }
+          }
         }
-        return f;
-      }, {});
+      }
+    };
 
-      assertValidBreakdown(formatted);
-      const randomSelection = weighted.select(formatted);
-      tmp[attr] = randomSelection;
-    });
+    const getSelectUntilFitting = (attr: string) => {
+      let isValidAttr = false;
+      let runs = 0;
 
-    keys.forEach(attr => {
-      let breakdownToUse = breakdown[attr];
-
-      keys.forEach(otherAttr => {
+      if (attr === 'Body' || attr === 'Head') {
         if (
-          tmp[otherAttr] &&
-          typeof breakdown[otherAttr][tmp[otherAttr]] != 'number' &&
-          breakdown[otherAttr][tmp[otherAttr]][attr]
+          Object.keys(tmp).includes('Body') &&
+          Object.keys(tmp).includes('Head')
         ) {
-          breakdownToUse = breakdown[otherAttr][tmp[otherAttr]][attr];
-
-          console.log(
-            'Because this item got attr',
-            tmp[otherAttr],
-            'we are using different probabilites for',
-            attr,
-          );
-
-          assertValidBreakdown(breakdownToUse);
-          const randomSelection = weighted.select(breakdownToUse);
-          tmp[attr] = randomSelection;
+          return;
         }
-      });
+      }
+
+      if (checkIfCategoryShouldBeIgnored(dnp, tmp, attr)) {
+        return;
+      }
+
+      while (!isValidAttr && runs < 50) {
+        runs++;
+        const breakdownToUse = breakdown[attr];
+
+        const formatted = Object.keys(breakdownToUse).reduce((f, key) => {
+          f[key] = getProbabilityOfAttribute(breakdownToUse[key]);
+          return f;
+        }, {});
+
+        const randomSelection = weighted.select(formatted);
+
+        if (
+          checkIfTraitShouldBeIgnored(dnp, need, tmp, attr, randomSelection)
+        ) {
+          continue;
+        }
+
+        /* 
+        if (tmp['Role']) {
+          console.log('the role', tmp['Role'], { attr, randomSelection });
+
+          
+          const needForRole = need['Role'][tmp['Role']];
+          if (
+            needForRole &&
+            (tmp['Role'] === 'Businessman.png' ||
+              tmp['Role'] === 'Scientist.png') &&
+            attr === 'Upper_Part'
+          ) {
+            const isNeededFulFilled = needForRole.some(needElem => {
+              console.log('checking need', { needElem, randomSelection });
+              return (
+                // check for direct name
+                needElem.toLowerCase() ===
+                  (randomSelection || '').toLowerCase() ||
+                // check for regex
+                new RegExp(needElem, 'i').test(randomSelection)
+              );
+            });
+
+            if (!isNeededFulFilled) {
+              continue;
+            }
+          }
+        } */
+
+        isValidAttr = true;
+        tmp[attr] = randomSelection;
+        followUpRequired(attr, randomSelection);
+
+        if (attr === 'Body') {
+          if (Object.keys(breakdown['Head']).includes(randomSelection)) {
+            tmp['Head'] = randomSelection;
+            followUpRequired('Head', randomSelection);
+          }
+        }
+      }
+      console.log({ isValidAttr, attr, selection: tmp[attr], runs });
+    };
+
+    for (const firstAttr of firstAttributes) {
+      if (firstAttr === 'Species' && tmp[firstAttr]) continue;
+      if (Object.keys(tmp).includes(firstAttr)) continue;
+      const breakdownToUse = breakdown[firstAttr];
+      if (!shouldIncludeTrait(breakdownToUse)) continue;
+      getSelectUntilFitting(firstAttr);
+    }
+
+    for (const attr of keys) {
+      if (firstAttributes.includes(attr)) continue;
+      if (attr === 'Species' && tmp[attr]) continue;
+      if (Object.keys(tmp).includes(attr)) continue;
+      const breakdownToUse = breakdown[attr];
+      if (!shouldIncludeTrait(breakdownToUse)) continue;
+      getSelectUntilFitting(attr);
+    }
+
+    Object.keys(tmp).forEach(attr1 => {
+      if (checkIfTraitShouldBeIgnored(dnp, need, tmp, attr1, tmp[attr1])) {
+        valid = false;
+        tmp = {
+          Species: tmp['Species'],
+        };
+      }
     });
 
     Object.keys(tmp).forEach(attr1 => {
-      Object.keys(tmp).forEach(attr2 => {
-        if (
-          dnp[attr1] &&
-          dnp[attr1][tmp[attr1]] &&
-          dnp[attr1][tmp[attr1]][attr2] &&
-          dnp[attr1][tmp[attr1]][attr2].includes(tmp[attr2])
-        ) {
-          console.log('Not including', tmp[attr1], tmp[attr2], 'together');
-          valid = false;
-          tmp = {};
-        }
-      });
+      if (need && need[attr1] && need[attr1][tmp[attr1]]) {
+        const needsDefinition = need[attr1][tmp[attr1]];
+        valid = checkNeedsDef(needsDefinition, tmp, attr1);
+        tmp = {
+          Species: tmp['Species'],
+        };
+      }
+
+      if (need && need[attr1] && need[attr1].attributesToInclude) {
+        const needsDefinition = need[attr1].attributesToInclude;
+        valid = checkNeedsDef(needsDefinition, tmp, attr1);
+        tmp = {
+          Species: tmp['Species'],
+        };
+      }
     });
   } while (!valid);
   return tmp;
 };
+
+export function checkNeedsDef(needsDefinition, tmp, attr1) {
+  if (Array.isArray(needsDefinition)) {
+    const isSomeRequiredExisiting = needsDefinition.some(needsElem => {
+      return Object.keys(tmp).some(attr2 => {
+        if (attr1 === attr2) return false;
+        return (
+          // check for direct name
+          needsElem.toLowerCase() === (tmp[attr2] || '').toLowerCase() ||
+          // check for regex
+          new RegExp(needsElem, 'i').test(tmp[attr2]) ||
+          // check to include one of a category
+          needsElem === attr2
+        );
+      });
+    });
+
+    if (!isSomeRequiredExisiting) {
+      console.log('For NEED', tmp[attr1], 'not including required one', {
+        attr1,
+        tmp,
+        need: needsDefinition,
+      });
+      return false;
+    }
+  }
+
+  if (
+    !Array.isArray(needsDefinition) &&
+    Object.keys(needsDefinition).every(needsCat => {
+      const category = needsCat;
+      const possibleNeeds = needsDefinition[needsCat];
+      console.log('got the needs cat', needsCat, possibleNeeds);
+      return possibleNeeds.some(needsElem => {
+        return Object.keys(tmp).some(attr2 => {
+          if (category !== attr2) return false;
+          return (
+            // check for direct name
+            needsElem.toLowerCase() === (tmp[attr2] || '').toLowerCase() ||
+            // check for regex
+            new RegExp(needsElem, 'i').test(tmp[attr2]) ||
+            // check to include one of a category
+            needsElem === attr2
+          );
+        });
+      });
+    })
+  ) {
+    console.log('For NEED', tmp[attr1], 'not including required one', {
+      attr1,
+      tmp,
+      need: needsDefinition,
+    });
+
+    return false;
+  }
+
+  return true;
+}
 
 export const getUnixTs = () => {
   return new Date().getTime() / 1000;

@@ -1,0 +1,49 @@
+[
+  [
+    {
+      "trait_type": "Background",
+      "value": "Nuclear Rain Green.png"
+    },
+    {
+      "trait_type": "Species",
+      "value": "DMT.png"
+    },
+    {
+      "trait_type": "Body",
+      "value": "DMT Drip Green.png"
+    },
+    {
+      "trait_type": "Head",
+      "value": "DMT Drip Green.png"
+    },
+    {
+      "trait_type": "Face",
+      "value": "Zombie Face.png"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Neon Zombie.png"
+    },
+    {
+      "trait_type": "Lungs",
+      "value": "Sol Diamond.png"
+    },
+    {
+      "trait_type": "Mouth",
+      "value": "Mouth J.png"
+    },
+    {
+      "trait_type": "Beard",
+      "value": "Moustache.png"
+    },
+    {
+      "trait_type": "Zombie Features",
+      "value": "Franken Neck.png"
+    },
+    {
+      "trait_type": "Brain",
+      "value": "Brain Yellow.png"
+    },
+  ],
+  []
+]
