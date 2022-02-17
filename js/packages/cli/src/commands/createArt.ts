@@ -29,7 +29,7 @@ function makeCreateImageWithCanvas(order, width, height) {
             .pipe(fs.createWriteStream(`${ASSETS_DIRECTORY}/${ID}.gif`));
           encoder.start();
           encoder.setRepeat(0); // 0 for repeat, -1 for no-repeat
-          encoder.setDelay(33); // frame delay in ms
+          encoder.setDelay(80); // frame delay in ms
           encoder.setQuality(10); // image quality. 10 is default.
           context.patternQuality = 'best';
           context.quality = 'best';
@@ -43,6 +43,8 @@ function makeCreateImageWithCanvas(order, width, height) {
 
           for (const frame of frameData) {
             for (const cur of order) {
+              const imgName = image[cur];
+              if (!imgName) continue;
               if (cur === gifCur) {
                 context.drawImage(
                   await loadImage(await stream2buffer(frame.getImage())),
@@ -52,7 +54,7 @@ function makeCreateImageWithCanvas(order, width, height) {
                   height,
                 );
               } else {
-                const imageLocation = `${TRAITS_DIRECTORY}/${cur}/${image[cur]}`;
+                const imageLocation = `${TRAITS_DIRECTORY}/${cur}/${imgName}`;
                 const loadedImage = await loadImage(imageLocation);
                 context.drawImage(loadedImage, 0, 0, width, height);
               }
@@ -65,6 +67,7 @@ function makeCreateImageWithCanvas(order, width, height) {
           return;
         };
         await loadGifCur(gifCur);
+        log.info(`Placed ${ID}.gif into ${ASSETS_DIRECTORY}.`);
       }
 
       for (const cur of order) {

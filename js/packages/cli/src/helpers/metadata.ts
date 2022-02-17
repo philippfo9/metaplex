@@ -13,6 +13,9 @@ const { writeFile, mkdir } = fs.promises;
 export const ASSETS_DIRECTORY = './assets';
 export const TRAITS_DIRECTORY = './traits';
 
+
+const allNeededTraits = ['Background', 'Species', 'Body', 'Head']
+
 export async function createMetadataFiles(
   numberOfImages: string,
   configLocation: string,
@@ -50,8 +53,10 @@ export async function createMetadataFiles(
 
   while (numberOfFilesCreated < parseInt(numberOfImages, 10)) {
     const randomizedSet = generateRandomSet(breakdown, dnp, need, required);
+    const keys = Object.keys(randomizedSet)
+    console.log({keys})
 
-    if (!_.some(randomizedSets, randomizedSet)) {
+    if (!_.some(randomizedSets, randomizedSet) && allNeededTraits.every(trait => keys.includes(trait))) {
       randomizedSets.push(randomizedSet);
       numberOfFilesCreated += 1;
     }

@@ -265,6 +265,69 @@ export const shouldIncludeTrait = (attr: TTraitGroup) => {
   return rand < probabilitySum;
 };
 
+
+const isNeed = (tmp, need) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+  let valid = true;
+  Object.keys(tmp).forEach(attr1 => {
+    if (need && need[attr1] && need[attr1][tmp[attr1]]) {
+      const needsDefinition = need[attr1][tmp[attr1]];
+
+      if (Array.isArray(needsDefinition)) {
+        const isSomeRequiredExisiting = needsDefinition.some(needsElem => {
+          return Object.keys(tmp).some(attr2 => {
+            if (attr1 === attr2) return false;
+            return (
+              // check for direct name
+              needsElem.toLowerCase() === (tmp[attr2] || '').toLowerCase() ||
+              // check for regex
+              new RegExp(needsElem, 'i').test(tmp[attr2]) ||
+              // check to include one of a category
+              needsElem === attr2
+            );
+          });
+        });
+
+        if (!isSomeRequiredExisiting) {
+          console.log('For NEED', tmp[attr1], 'not including required one', {
+            attr1,
+            tmp,
+            need: need[attr1][tmp[attr1]],
+          });
+
+          valid = false;
+          tmp = {
+            Species: tmp['Species'],
+          };
+        }
+      }
+
+      if (
+        !Array.isArray(needsDefinition) &&
+        Object.keys(needsDefinition).every(needsCat => {
+          const category = needsCat;
+          const possibleNeeds = needsDefinition[needsCat];
+          return possibleNeeds.some(needsElem => {
+            return Object.keys(tmp).some(attr2 => {
+              if (category !== attr2) return false;
+              return (
+                // check for direct name
+                needsElem.toLowerCase() === (tmp[attr2] || '').toLowerCase() ||
+                // check for regex
+                new RegExp(needsElem, 'i').test(tmp[attr2]) ||
+                // check to include one of a category
+                needsElem === attr2
+              );
+            });
+          });
+        })
+      ) {
+        valid = false;
+      }
+    }
+  });
+  return valid;
+};
+
 const checkIfCategoryShouldBeIgnored = (dnp, tmp, attr) => {
   for (const existingAttr in tmp) {
     const existingTrait = tmp[existingAttr];
@@ -294,6 +357,7 @@ const checkIfCategoryShouldBeIgnored = (dnp, tmp, attr) => {
           );
         })
       ) {
+        console.log('ignored due to attributesToExclude', {attrToExcl: dnp[existingAttr].attributesToExclude, attr});
         return true;
       }
 
@@ -353,6 +417,7 @@ const checkIfTraitShouldBeIgnored = (dnp, need, tmp, attr, randomSelection) => {
         );
       })
     ) {
+      console.log('ignored due to attributesToExclude', {attrToExcl: dnp[existingAttr].attributesToExclude, randomSelection});
       return true;
     }
 
@@ -431,29 +496,36 @@ export const generateRandomSet = (breakdown, dnp, need, required) => {
               getSelectUntilFitting(followUpAttribute);
             }
             for (const followUpTrait of requiredConf.traits) {
-              console.log('adding', { followUpTrait });
+              let selectedFollowUpTrait = followUpTrait;
+              if (!followUpTrait.attribute && Object.keys(followUpTrait).every(key => !Number.isNaN(key))) {
+                // TODO: have the right one selected
+                const weights = Object.keys(followUpTrait).map(weight => Number(weight))
+                const items = Object.values(followUpTrait)
+                selectedFollowUpTrait = weighted.select(items, weights)
+              }
+              console.log('adding', { selectedFollowUpTrait, followUpTrait });
               if (
-                followUpTrait.trait.includes('.png') ||
-                followUpTrait.trait.includes('.gif')
+                selectedFollowUpTrait.trait.includes('.png') ||
+                selectedFollowUpTrait.trait.includes('.gif')
               ) {
-                tmp[followUpTrait.attribute] = followUpTrait.trait;
+                tmp[selectedFollowUpTrait.attribute] = selectedFollowUpTrait.trait;
               } else {
-                const breakdownToUse = breakdown[followUpTrait.attribute];
+                const breakdownToUse = breakdown[selectedFollowUpTrait.attribute];
                 const formatted = Object.keys(breakdownToUse)
                   .filter(key => {
-                    return new RegExp(followUpTrait.trait, 'i').test(key);
+                    return new RegExp(selectedFollowUpTrait.trait, 'i').test(key);
                   })
                   .reduce((f, key) => {
                     f[key] = getProbabilityOfAttribute(breakdownToUse[key]);
                     return f;
                   }, {});
                 const randomSubSelection = weighted.select(formatted);
-                tmp[followUpTrait.attribute] = randomSubSelection;
+                tmp[selectedFollowUpTrait.attribute] = randomSubSelection;
               }
               console.log(
                 'added as follow up trait:',
-                followUpTrait.attribute,
-                tmp[followUpTrait.attribute],
+                followUpTrait,
+                tmp[selectedFollowUpTrait.attribute],
               );
             }
           }
@@ -475,6 +547,7 @@ export const generateRandomSet = (breakdown, dnp, need, required) => {
       }
 
       if (checkIfCategoryShouldBeIgnored(dnp, tmp, attr)) {
+        console.log('avoid cat before going further', {tmp, attr});
         return;
       }
 
@@ -492,6 +565,8 @@ export const generateRandomSet = (breakdown, dnp, need, required) => {
         if (
           checkIfTraitShouldBeIgnored(dnp, need, tmp, attr, randomSelection)
         ) {
+          console.log('avoid before going further', {tmp, attr, randomSelection});
+          
           continue;
         }
 
@@ -556,6 +631,12 @@ export const generateRandomSet = (breakdown, dnp, need, required) => {
     }
 
     Object.keys(tmp).forEach(attr1 => {
+      if (checkIfCategoryShouldBeIgnored(dnp, tmp, attr1)) {
+        valid = false;
+        tmp = {
+          Species: tmp['Species'],
+        };
+      }
       if (checkIfTraitShouldBeIgnored(dnp, need, tmp, attr1, tmp[attr1])) {
         valid = false;
         tmp = {
@@ -568,17 +649,22 @@ export const generateRandomSet = (breakdown, dnp, need, required) => {
       if (need && need[attr1] && need[attr1][tmp[attr1]]) {
         const needsDefinition = need[attr1][tmp[attr1]];
         valid = checkNeedsDef(needsDefinition, tmp, attr1);
-        tmp = {
-          Species: tmp['Species'],
-        };
+        if (!valid) {
+          tmp = {
+            Species: tmp['Species'],
+          };
+        }
       }
 
       if (need && need[attr1] && need[attr1].attributesToInclude) {
         const needsDefinition = need[attr1].attributesToInclude;
+        console.log('over attributesToInclude', need[attr1].attributesToInclude);
         valid = checkNeedsDef(needsDefinition, tmp, attr1);
-        tmp = {
-          Species: tmp['Species'],
-        };
+        if (!valid) {
+          tmp = {
+            Species: tmp['Species'],
+          };
+        }
       }
     });
   } while (!valid);
