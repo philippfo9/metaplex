@@ -260,7 +260,6 @@ export const shouldIncludeTrait = (attr: TTraitGroup) => {
   }
 
   const rand = Math.random() * 100;
-  console.log({ attr, rand, probabilitySum });
 
   return rand < probabilitySum;
 };
@@ -480,8 +479,6 @@ export const generateRandomSet = (breakdown, dnp, need, required) => {
     const keys = shuffle(Object.keys(breakdown));
 
     const followUpRequired = (attr: string, randomSelection: string) => {
-      console.log('just received followup for', { attr, randomSelection });
-
       const requiredForAttr: any = required[attr];
       if (requiredForAttr) {
         for (const [key, requiredConfig] of Object.entries(requiredForAttr)) {
@@ -519,6 +516,7 @@ export const generateRandomSet = (breakdown, dnp, need, required) => {
                     f[key] = getProbabilityOfAttribute(breakdownToUse[key]);
                     return f;
                   }, {});
+                console.log('formatted selection followup', formatted);
                 const randomSubSelection = weighted.select(formatted);
                 tmp[selectedFollowUpTrait.attribute] = randomSubSelection;
               }
@@ -612,6 +610,10 @@ export const generateRandomSet = (breakdown, dnp, need, required) => {
       }
       console.log({ isValidAttr, attr, selection: tmp[attr], runs });
     };
+
+    if (tmp['Species']) {
+      followUpRequired('Species', tmp['Species']);
+    }
 
     for (const firstAttr of firstAttributes) {
       if (firstAttr === 'Species' && tmp[firstAttr]) continue;
